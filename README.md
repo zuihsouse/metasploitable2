@@ -45,7 +45,7 @@ Nmap done: 1 IP address (1 host up) scanned in 4.47 seconds
 
 We can see that many services are running on this machine, let's start with the web server running on port 80.
 
-# Port 80
+# II. Apache
 
 We quickly learn that the web server is Apache 2.2.8. It use PHP 5.2.4 and there is, at the root of the server, a page that contains 5 links to 5 differents apps :
 
@@ -112,7 +112,7 @@ Server username: uid=33, gid=33, euid=33, egid=33
 
 So we get a nice shell, let's move on now to another web app.
 
-## Phpmyadmin
+## Phpmyadmin and MySQL
 
 We can assume that phpmyadmin is backed by MySQL that is listening on port 3306.
 
@@ -133,6 +133,26 @@ msf auxiliary(scanner/mysql/mysql_login) > run
 [*] Auxiliary module execution completed
 ```
 
-So the MySQL root password is blank... But we can't connect as root with phpmyadmin. However, we are able to connect to the db with `mysql -u root -h 192.168.195.128 -P 3306 -p --skip-ssl`.
+So the MySQL root password is blank... But we can't connect as root with phpmyadmin, maybe it does not permit to login as root. However, we are able to connect to the db with `mysql -u root -h 192.168.195.128 -P 3306 -p --skip-ssl`.
+With that, we create a new user and grant him all privileges : 
+
+```
+mysql> create user 'user' identified by 'password';
+Query OK, 0 rows affected (0,00 sec)
+
+mysql> grant all privileges on * to 'user';
+Query OK, 0 rows affected (0,00 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0,00 sec)
+```
+
+We can now login with this user on phpmyadmin.
+
+## Multidae
+
+> OWASP Mutillidae II is a free, open source, deliberately vulnerable web-application providing a target for web-security enthusiast. 
+
+
 
 
